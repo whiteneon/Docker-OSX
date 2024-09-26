@@ -162,10 +162,6 @@ WORKDIR /home/arch/OSX-KVM
 # shortname default is catalina, which means :latest is catalina
 ARG SHORTNAME=catalina
 
-RUN make \
-    && qemu-img convert BaseSystem.dmg -O qcow2 -p -c BaseSystem.img \
-    && rm ./BaseSystem.dmg
-
 # fix invalid signature on old libguestfs
 ARG SIGLEVEL=Never
 
@@ -360,7 +356,17 @@ VOLUME ["/tmp/.X11-unix"]
 # the default serial numbers are already contained in ./OpenCore/OpenCore.qcow2
 # And the default serial numbers
 
-CMD sudo touch /dev/kvm /dev/snd "${IMAGE_PATH}" "${BOOTDISK}" "${ENV}" 2>/dev/null || true \
+# DMCA compliant download process
+# If BaseSystem.img does not exist, download $SHORTNAME
+
+ARG BASESYSTEM_IMAGE=BaseSystem.img
+
+CMD ! [[ -e "${BASESYSTEM_IMAGE:-BaseSystem.img}" ]] \
+        && printf '%s\n' "No BaseSystem.img available, downloading ${SHORTNAME}" \
+        && make \
+        && qemu-img convert BaseSystem.dmg -O qcow2 -p -c ${BASESYSTEM_IMAGE:-BaseSystem.img} \
+        && rm ./BaseSystem.dmg \
+    ; sudo touch /dev/kvm /dev/snd "${IMAGE_PATH}" "${BOOTDISK}" "${ENV}" 2>/dev/null || true \
     ; sudo chown -R $(id -u):$(id -g) /dev/kvm /dev/snd "${IMAGE_PATH}" "${BOOTDISK}" "${ENV}" 2>/dev/null || true \
     ; [[ "${NOPICKER}" == true ]] && { \
         sed -i '/^.*InstallMedia.*/d' Launch.sh \
